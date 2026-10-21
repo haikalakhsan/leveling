@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYS.CORE - Final Awakening [V7.1 STABLE]</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- Konfigurasi Tailwind Khusus -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Space Grotesk', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+                    colors: {
+                        sys: { dark: '#050914', panel: '#0F1626', border: '#1E2D4A', accent: '#00F0FF', emerald: '#00FFA3', danger: '#FF0055', warning: '#FFB800', purple: '#B534FF', textMain: '#E2E8F0', textMuted: '#94A3B8' }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Menghubungkan CSS Eksternal -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="antialiased min-h-screen flex flex-col md:flex-row font-sans relative">
+
+    <!-- Toast Container -->
+    <div id="toast-container" aria-live="polite" class="fixed top-5 right-5 z-[200] flex flex-col gap-3 w-80 pointer-events-none"></div>
+
+    <!-- System Confirmation Modal -->
+    <div id="sys-modal" role="dialog" aria-labelledby="sys-modal-title" class="fixed inset-0 bg-black/80 z-[100] hidden items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
+        <div class="sys-panel p-6 max-w-md w-11/12 rounded-xl border border-sys-warning shadow-2xl transform scale-95 transition-transform duration-300" id="sys-modal-content">
+            <h3 class="text-sys-warning font-bold text-xl mb-4 border-b border-sys-warning/30 pb-2 flex items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> <span id="sys-modal-title">SYSTEM PROMPT</span>
+            </h3>
+            <p id="sys-modal-msg" class="text-white font-mono text-sm mb-6 whitespace-pre-wrap leading-relaxed"></p>
+            <div class="flex justify-end gap-3">
+                <button id="sys-modal-cancel" aria-label="Batal" class="btn-sys px-5 py-2 rounded bg-sys-dark border border-sys-border hover:bg-sys-border text-white transition font-mono text-sm">BATAL</button>
+                <button id="sys-modal-confirm" aria-label="Konfirmasi" class="btn-sys px-5 py-2 rounded bg-sys-warning text-sys-dark font-bold hover:bg-white transition font-mono text-sm">LANJUTKAN</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Quest Modal -->
+    <div id="quest-modal" role="dialog" aria-labelledby="quest-modal-title" class="fixed inset-0 bg-black/80 z-[90] hidden items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
+        <div class="sys-panel p-6 max-w-xl w-11/12 rounded-xl border border-sys-accent shadow-2xl transform scale-95 transition-transform duration-300 overflow-y-auto max-h-[90vh]" id="quest-modal-content">
+            <h3 class="text-sys-accent font-bold text-xl mb-4 border-b border-sys-accent/30 pb-2 flex items-center gap-2">
+                <i class="fa-solid fa-folder-plus" aria-hidden="true"></i> <span id="quest-modal-title">REGISTER NEW QUEST</span>
+            </h3>
+            <form id="quest-form" class="space-y-4">
+                <input type="hidden" id="q-id">
+                <div>
+                    <label for="q-title" class="block text-sys-textMuted text-xs font-mono mb-1">QUEST TITLE</label>
+                    <input type="text" id="q-title" required maxlength="100" class="w-full bg-sys-dark border border-sys-border rounded px-4 py-2 text-white focus:border-sys-accent focus:outline-none font-mono text-sm">
+                </div>
+                <div>
+                    <label for="q-desc" class="block text-sys-textMuted text-xs font-mono mb-1">DESCRIPTION (OPTIONAL)</label>
+                    <input type="text" id="q-desc" maxlength="250" class="w-full bg-sys-dark border border-sys-border rounded px-4 py-2 text-white focus:border-sys-accent focus:outline-none font-mono text-sm placeholder-sys-border" placeholder="Detail misi...">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="q-type" class="block text-sys-textMuted text-xs font-mono mb-1">CYCLE TYPE</label>
+                        <select id="q-type" class="w-full bg-sys-dark border border-sys-border rounded px-4 py-2 text-white focus:border-sys-accent focus:outline-none font-mono text-sm appearance-none">
+                            <option value="daily">Daily (Harian)</option>
+                            <option value="weekly">Weekly (Mingguan)</option>
+                            <option value="one-time">One-Time (Sekali)</option>
+                            <option value="milestone">Milestone (Pencapaian)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="q-rank" class="block text-sys-textMuted text-xs font-mono mb-1">DIFFICULTY RANK (EXP)</label>
+                        <select id="q-rank" class="w-full bg-sys-dark border border-sys-border rounded px-4 py-2 text-white focus:border-sys-accent focus:outline-none font-mono text-sm appearance-none">
+                            <option value="10">E-Rank (10 EXP)</option>
+                            <option value="25">D-Rank (25 EXP)</option>
+                            <option value="50">C-Rank (50 EXP)</option>
+                            <option value="100">B-Rank (100 EXP)</option>
+                            <option value="250">A-Rank (250 EXP)</option>
+                            <option value="1000">S-Rank (1000 EXP)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="bg-sys-dark/50 p-4 border border-sys-border rounded-lg mt-4">
+                    <h4 class="text-sys-accent text-xs font-mono mb-3"><i class="fa-solid fa-link" aria-hidden="true"></i> INTEGRASI METRIK NYATA</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="q-metric-id" class="block text-sys-textMuted text-xs font-mono mb-1">KATEGORI METRIK</label>
+                            <select id="q-metric-id" class="w-full bg-sys-dark border border-sys-border rounded px-3 py-2 text-white focus:border-sys-accent focus:outline-none font-mono text-sm appearance-none">
+                                <option value="none">-- Tidak Ada --</option>
+                                <option value="study">Belajar (Fokus)</option>
+                                <option value="coding">Koding & Proyek</option>
+                                <option value="workout">Olahraga & Fisik</option>
+                                <option value="health">Kesehatan Pribadi</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="q-metric-val" class="block text-sys-textMuted text-xs font-mono mb-1">NILAI DITAMBAHKAN</label>
+                            <div class="flex">
+                                <input type="number" id="q-metric-val" min="1" max="10000" placeholder="Mis: 30" class="w-full bg-sys-dark border border-sys-border rounded-l px-3 py-2 text-white focus:border-sys-accent focus:outline-none font-mono text-sm">
+                                <div class="bg-sys-border px-3 py-2 text-sys-textMuted font-mono text-xs rounded-r flex items-center" aria-hidden="true" id="q-metric-unit">Unit</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-sys-border">
+                    <button type="button" aria-label="Tutup Modal Quest" onclick="system.closeQuestModal()" class="btn-sys px-5 py-2 rounded bg-sys-dark border border-sys-border hover:bg-sys-border text-white transition font-mono text-sm">CANCEL</button>
+                    <button type="submit" aria-label="Simpan Quest" class="btn-sys px-5 py-2 rounded bg-sys-accent text-sys-dark font-bold hover:bg-white transition font-mono text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-satellite-dish" aria-hidden="true"></i> TRANSMIT
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Boss Quest Modal -->
+    <div id="boss-modal" role="dialog" aria-labelledby="boss-modal-title" class="fixed inset-0 bg-black/80 z-[90] hidden items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
+        <div class="sys-panel p-6 max-w-xl w-11/12 rounded-xl border border-sys-danger shadow-2xl transform scale-95 transition-transform duration-300 max-h-[90vh] overflow-y-auto" id="boss-modal-content">
+            <h3 class="text-sys-danger font-bold text-xl mb-4 border-b border-sys-danger/30 pb-2 flex items-center gap-2">
+                <i class="fa-solid fa-skull" aria-hidden="true"></i> <span id="boss-modal-title">REGISTER RAID / BOSS QUEST</span>
+            </h3>
+            <form id="boss-form" class="space-y-4">
+                <div>
+                    <label for="b-title" class="block text-sys-textMuted text-xs font-mono mb-1">RAID TITLE</label>
+                    <input type="text" id="b-title" required maxlength="100" class="w-full bg-sys-dark border border-sys-border rounded px-4 py-2 text-white focus:border-sys-danger focus:outline-none font-mono text-sm placeholder-sys-border" placeholder="e.g., Deploy Web Application">
+                </div>
+                <div>
+                    <label for="b-desc" class="block text-sys-textMuted text-xs font-mono mb-1">RAID LORE (DESC)</label>
+                    <input type="text" id="b-desc" maxlength="250" class="w-full bg-sys-dark border border-sys-border rounded px-4 py-2 text-white focus:border-sys-danger focus:outline-none font-mono text-sm placeholder-sys-border">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="b-exp" class="block text-sys-textMuted text-xs font-mono mb-1">EXP REWARD (MASSIVE)</label>
+                        <input type="number" id="b-exp" required min="1000" max="50000" class="w-full bg-sys-dark border border-sys-border rounded px-4 py-2 text-white focus:border-sys-danger focus:outline-none font-mono text-sm" value="5000">
+                    </div>
+                    <div>
+                        <label for="b-deadline" class="block text-sys-textMuted text-xs font-mono mb-1">DEADLINE (OPTIONAL)</label>
+                        <input type="date" id="b-deadline" class="w-full bg-sys-dark border border-sys-border rounded px-4 py-2 text-white focus:border-sys-danger focus:outline-none font-mono text-sm">
+                    </div>
+                </div>
+
+                <div class="bg-sys-dark/50 p-4 border border-sys-border rounded-lg mt-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="text-sys-danger text-xs font-mono"><i class="fa-solid fa-list-check" aria-hidden="true"></i> RAID SUB-TASKS</h4>
+                        <button type="button" aria-label="Tambah Subtask" onclick="system.addBossSubtaskField()" class="text-xs font-mono text-sys-accent hover:text-white transition">+ Add Task</button>
+                    </div>
+                    <div id="boss-subtasks-container" class="space-y-2">
+                        <!-- Dynamic Inputs -->
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-sys-border">
+                    <button type="button" aria-label="Tutup Modal Raid" onclick="system.closeBossModal()" class="btn-sys px-5 py-2 rounded bg-sys-dark border border-sys-border hover:bg-sys-border text-white transition font-mono text-sm">CANCEL</button>
+                    <button type="submit" aria-label="Inisiasi Raid" class="btn-sys px-5 py-2 rounded bg-sys-danger text-white font-bold hover:bg-white hover:text-sys-danger transition font-mono text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-fire" aria-hidden="true"></i> INITIATE RAID
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Analytics Target Modal -->
+    <div id="target-modal" role="dialog" aria-labelledby="target-modal-title" class="fixed inset-0 bg-black/80 z-[90] hidden items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
+        <div class="sys-panel p-6 max-w-sm w-11/12 rounded-xl border border-sys-accent shadow-2xl transform scale-95 transition-transform duration-300" id="target-modal-content">
+            <h3 class="text-sys-accent font-bold text-xl mb-4 border-b border-sys-accent/30 pb-2 flex items-center gap-2">
+                <i class="fa-solid fa-bullseye" aria-hidden="true"></i> <span id="target-modal-title">UPDATE METRIC TARGETS</span>
+            </h3>
+            <form id="target-form" class="space-y-4">
+                <!-- Injected via JS -->
+                <div id="target-inputs-container" class="space-y-3"></div>
+                
+                <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-sys-border">
+                    <button type="button" onclick="system.closeTargetModal()" class="btn-sys px-5 py-2 rounded bg-sys-dark border border-sys-border hover:bg-sys-border text-white transition font-mono text-sm">BATAL</button>
+                    <button type="submit" class="btn-sys px-5 py-2 rounded bg-sys-accent text-sys-dark font-bold hover:bg-white transition font-mono text-sm">SIMPAN</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Sidebar Navigation -->
+    <nav class="w-full md:w-72 sys-panel flex flex-col p-5 md:fixed z-40 border-b md:border-r border-sys-border overflow-y-auto md:min-h-screen shrink-0">
+        <div class="flex items-center gap-4 mb-8 pb-6 border-b border-sys-border">
+            <div class="relative">
+                <i class="fa-solid fa-microchip text-sys-accent text-3xl" aria-hidden="true"></i>
+                <div class="absolute inset-0 bg-sys-accent blur-md opacity-30 animate-pulse"></div>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-widest text-white neon-text-blue">SYS.CORE</h1>
+                <p class="text-[10px] text-sys-purple font-mono tracking-wider">v7.1 [STABLE]</p>
+            </div>
+        </div>
+
+        <div class="flex flex-col gap-3 font-mono text-sm">
+            <button onclick="system.switchTab('status')" id="nav-status" aria-label="Buka Status Panel" class="nav-btn p-3 rounded hover:bg-sys-border/50 text-sys-textMuted hover:text-white border-l-2 border-transparent hover:border-sys-textMuted flex items-center gap-3 transition-colors nav-active">
+                <i class="fa-solid fa-user-astronaut w-5 text-center" aria-hidden="true"></i> Status Panel
+            </button>
+            <button onclick="system.switchTab('progression')" id="nav-progression" aria-label="Buka Awakening System" class="nav-btn p-3 rounded hover:bg-sys-border/50 text-sys-textMuted hover:text-white border-l-2 border-transparent hover:border-sys-purple flex items-center gap-3 transition-colors text-sys-purple">
+                <i class="fa-solid fa-dna w-5 text-center" aria-hidden="true"></i> Awakening System
+            </button>
+            <button onclick="system.switchTab('quest')" id="nav-quest" aria-label="Buka Quest Board" class="nav-btn p-3 rounded hover:bg-sys-border/50 text-sys-textMuted hover:text-white border-l-2 border-transparent hover:border-sys-textMuted flex items-center gap-3 transition-colors">
+                <i class="fa-solid fa-list-check w-5 text-center" aria-hidden="true"></i> Quest Board
+            </button>
+            <button onclick="system.switchTab('analytics')" id="nav-analytics" aria-label="Buka Data Analytics" class="nav-btn p-3 rounded hover:bg-sys-border/50 text-sys-textMuted hover:text-white border-l-2 border-transparent hover:border-sys-textMuted flex items-center gap-3 transition-colors">
+                <i class="fa-solid fa-chart-line w-5 text-center" aria-hidden="true"></i> Data Analytics
+            </button>
+            <button onclick="system.switchTab('settings')" id="nav-settings" aria-label="Buka Pengaturan Sistem" class="nav-btn p-3 rounded hover:bg-sys-border/50 text-sys-textMuted hover:text-white border-l-2 border-transparent hover:border-sys-textMuted flex items-center gap-3 transition-colors">
+                <i class="fa-solid fa-server w-5 text-center" aria-hidden="true"></i> System Center
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 md:ml-72 p-4 md:p-8 w-full max-w-7xl mx-auto overflow-y-auto pb-20">
+
+        <header class="mb-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div>
+                <h2 class="text-4xl font-bold text-white uppercase tracking-widest mb-1" id="page-title">Player Status</h2>
+                <p class="text-sys-textMuted font-mono text-sm" id="page-subtitle"><i class="fa-solid fa-terminal text-xs mr-2" aria-hidden="true"></i>Sistem Atribut & Level RPG.</p>
+            </div>
+
+            <div class="sys-panel px-8 py-4 rounded-xl text-center min-w-[220px] relative overflow-hidden group tooltip-container">
+                <div class="absolute inset-0 bg-sys-emerald/5 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                <p class="text-xs text-sys-textMuted uppercase tracking-widest mb-1 font-mono">Combat Power</p>
+                <div class="text-4xl font-bold text-sys-emerald font-mono neon-text-green" id="ui-combat-power">0</div>
+                <span class="tooltip-text absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black border border-sys-border text-white text-[10px] p-2 rounded opacity-0 invisible transition-opacity w-48 z-20 font-mono text-center">
+                    Formula: (Σ BaseStats * Multiplier) * (1 + (Level * 0.05))
+                </span>
+            </div>
+        </header>
+
+        <!-- STATUS SECTION -->
+        <div id="section-status" class="section-container block">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+                <div class="sys-panel p-6 md:p-8 rounded-2xl col-span-1 lg:col-span-2 flex flex-col justify-between relative overflow-hidden">
+                    <i class="fa-brands fa-d-and-d absolute -right-10 -bottom-10 text-[200px] text-white opacity-5 pointer-events-none" aria-hidden="true"></i>
+
+                    <div class="relative z-10 mb-8">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-4 gap-4">
+                            <div>
+                                <h3 class="text-sm font-mono mb-2 px-3 py-1 bg-sys-dark rounded-full inline-block border border-sys-border shadow-inner" id="ui-hunter-rank-badge">
+                                    [RANK: <span class="text-sys-textMuted">E</span>]
+                                </h3>
+                                <div class="text-6xl font-bold text-white flex items-baseline gap-2">
+                                    <span class="text-2xl text-sys-textMuted font-mono font-normal">LVL.</span>
+                                    <span id="ui-level" class="neon-text-blue">1</span>
+                                </div>
+                            </div>
+                            <div class="text-right font-mono text-sm bg-sys-dark/50 px-4 py-2 rounded-lg border border-sys-border w-full md:w-auto flex justify-between md:block">
+                                <span class="text-sys-textMuted">TOTAL EXP: </span>
+                                <div>
+                                    <span id="ui-exp" class="text-sys-warning font-bold">0</span> 
+                                    <span class="text-sys-textMuted mx-1">/</span> 
+                                    <span id="ui-max-exp" class="text-white">100</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="w-full bg-sys-dark h-5 rounded-full overflow-hidden border border-sys-border p-[3px] shadow-inner relative" aria-hidden="true">
+                            <div id="ui-xp-bar" class="xp-bar-fill h-full bg-gradient-to-r from-sys-warning to-yellow-200 rounded-full w-[0%] relative">
+                                <div class="absolute inset-0 bg-white/20 animate-pulse rounded-full"></div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between mt-3 font-mono text-xs h-6">
+                            <p class="text-sys-textMuted" id="ui-level-message">Membutuhkan 100 EXP untuk Level Up.</p>
+                            <p class="text-sys-accent animate-pulse hidden" id="ui-stat-point-alert">Unallocated Pts: <span id="ui-unallocated-pts" class="font-bold text-white text-base">0</span></p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 relative z-10 font-mono">
+                        <!-- STR -->
+                        <div class="bg-sys-dark/80 p-3 rounded-lg border border-sys-border flex flex-col items-center justify-center gap-2 transition-colors relative tooltip-container">
+                            <span class="text-sys-textMuted text-xs font-bold tracking-wider">STR <i class="fa-solid fa-dumbbell text-sys-danger/70 ml-1" aria-hidden="true"></i></span>
+                            <div class="text-2xl font-bold text-white" id="ui-stat-str">10</div>
+                            <button aria-label="Tambah STR" onclick="system.addStat('str')" class="btn-sys w-full py-1 text-xs bg-sys-border hover:bg-sys-danger hover:text-white rounded transition-colors stat-btn">+</button>
+                            <span class="tooltip-text absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 invisible transition-opacity whitespace-nowrap z-20" aria-hidden="true">Strength (Kekuatan)</span>
+                        </div>
+                        <!-- AGI -->
+                        <div class="bg-sys-dark/80 p-3 rounded-lg border border-sys-border flex flex-col items-center justify-center gap-2 transition-colors relative tooltip-container">
+                            <span class="text-sys-textMuted text-xs font-bold tracking-wider">AGI <i class="fa-solid fa-wind text-sys-emerald/70 ml-1" aria-hidden="true"></i></span>
+                            <div class="text-2xl font-bold text-white" id="ui-stat-agi">10</div>
+                            <button aria-label="Tambah AGI" onclick="system.addStat('agi')" class="btn-sys w-full py-1 text-xs bg-sys-border hover:bg-sys-emerald hover:text-sys-dark rounded transition-colors stat-btn">+</button>
+                            <span class="tooltip-text absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 invisible transition-opacity whitespace-nowrap z-20" aria-hidden="true">Agility (Kelincahan)</span>
+                        </div>
+                        <!-- INT -->
+                        <div class="bg-sys-dark/80 p-3 rounded-lg border border-sys-border flex flex-col items-center justify-center gap-2 transition-colors relative tooltip-container">
+                            <span class="text-sys-textMuted text-xs font-bold tracking-wider">INT <i class="fa-solid fa-brain text-sys-accent/70 ml-1" aria-hidden="true"></i></span>
+                            <div class="text-2xl font-bold text-white" id="ui-stat-int">10</div>
+                            <button aria-label="Tambah INT" onclick="system.addStat('int')" class="btn-sys w-full py-1 text-xs bg-sys-border hover:bg-sys-accent hover:text-sys-dark rounded transition-colors stat-btn">+</button>
+                            <span class="tooltip-text absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 invisible transition-opacity whitespace-nowrap z-20" aria-hidden="true">Intelligence (Kecerdasan)</span>
+                        </div>
+                        <!-- VIT -->
+                        <div class="bg-sys-dark/80 p-3 rounded-lg border border-sys-border flex flex-col items-center justify-center gap-2 transition-colors relative tooltip-container">
+                            <span class="text-sys-textMuted text-xs font-bold tracking-wider">VIT <i class="fa-solid fa-heart text-orange-500/70 ml-1" aria-hidden="true"></i></span>
+                            <div class="text-2xl font-bold text-white" id="ui-stat-vit">10</div>
+                            <button aria-label="Tambah VIT" onclick="system.addStat('vit')" class="btn-sys w-full py-1 text-xs bg-sys-border hover:bg-orange-500 hover:text-white rounded transition-colors stat-btn">+</button>
+                            <span class="tooltip-text absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 invisible transition-opacity whitespace-nowrap z-20" aria-hidden="true">Vitality (Stamina)</span>
+                        </div>
+                        <!-- PER -->
+                        <div class="bg-sys-dark/80 p-3 rounded-lg border border-sys-border flex flex-col items-center justify-center gap-2 transition-colors relative tooltip-container">
+                            <span class="text-sys-textMuted text-xs font-bold tracking-wider">PER <i class="fa-solid fa-eye text-purple-500/70 ml-1" aria-hidden="true"></i></span>
+                            <div class="text-2xl font-bold text-white" id="ui-stat-per">10</div>
+                            <button aria-label="Tambah PER" onclick="system.addStat('per')" class="btn-sys w-full py-1 text-xs bg-sys-border hover:bg-purple-500 hover:text-white rounded transition-colors stat-btn">+</button>
+                            <span class="tooltip-text absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 invisible transition-opacity whitespace-nowrap z-20" aria-hidden="true">Perception (Fokus)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Radar Chart -->
+                <div class="sys-panel p-6 rounded-2xl flex flex-col items-center justify-center min-h-[300px]">
+                    <h3 class="text-sm font-mono text-sys-textMuted mb-4 w-full text-left flex justify-between items-center">
+                        <span><i class="fa-solid fa-crosshairs mr-2" aria-hidden="true"></i>RPG Stat Matrix</span>
+                        <span class="text-[10px] bg-sys-border/50 px-2 py-0.5 rounded text-sys-textMuted">GAMIFICATION</span>
+                    </h3>
+                    <div class="w-full relative aspect-square flex items-center justify-center" aria-label="Radar Chart Atribut" role="img">
+                        <canvas id="statRadarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PROGRESSION & AWAKENING SECTION -->
+        <div id="section-progression" class="section-container hidden">
+
+            <!-- Rank & Rules Panel -->
+            <div class="sys-panel p-6 rounded-2xl mb-6 flex flex-col md:flex-row gap-6 items-center">
+                <div class="flex-shrink-0 text-center">
+                    <p class="text-xs font-mono text-sys-textMuted mb-2">CURRENT HUNTER RANK</p>
+                    <div class="w-32 h-32 rounded-full border-4 border-sys-border bg-sys-dark flex items-center justify-center shadow-[0_0_30px_rgba(0,0,0,0.5)] relative overflow-hidden group">
+                        <div class="absolute inset-0 opacity-20 bg-gradient-to-tr from-transparent to-sys-purple group-hover:opacity-40 transition-opacity"></div>
+                        <span class="text-6xl font-bold text-white" id="ui-big-rank">E</span>
+                    </div>
+                </div>
+                <div class="flex-1 bg-sys-dark/50 border border-sys-border p-4 rounded-xl">
+                    <h4 class="text-sys-purple font-mono font-bold text-sm mb-2"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> RANKING PROTOCOL</h4>
+                    <p class="text-sys-textMuted text-xs mb-2 leading-relaxed">
+                        Peringkat (Rank) dikalkulasi secara otomatis oleh sistem berdasarkan <span class="text-sys-accent">Level Karakter</span> dan <span class="text-sys-emerald">Total Penyelesaian Quest</span>. Parameter ini bersifat absolut dan direkam dalam Ledger.
+                    </p>
+                    <ul class="grid grid-cols-2 md:grid-cols-3 gap-2 text-[10px] font-mono text-sys-textMuted mt-3">
+                        <li class="bg-sys-dark px-2 py-1 rounded border border-sys-border">E: Lvl 1+</li>
+                        <li class="bg-sys-dark px-2 py-1 rounded border border-sys-border">D: Lvl 5 & 20+ Qst</li>
+                        <li class="bg-sys-dark px-2 py-1 rounded border border-sys-border">C: Lvl 15 & 50+ Qst</li>
+                        <li class="bg-sys-dark px-2 py-1 rounded border border-sys-border">B: Lvl 30 & 150+ Qst</li>
+                        <li class="bg-sys-dark px-2 py-1 rounded border border-sys-border">A: Lvl 50 & 300+ Qst</li>
+                        <li class="bg-sys-dark px-2 py-1 rounded border border-sys-border">S: Lvl 80 & 500+ Qst</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Achievements Board -->
+            <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2"><i class="fa-solid fa-trophy text-sys-warning" aria-hidden="true"></i> MONUMENT OF ACHIEVEMENTS</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10" id="achievements-list">
+                <!-- Injected via JS safely -->
+            </div>
+
+            <!-- Skill Tree -->
+            <div class="flex justify-between items-end mb-4 border-b border-sys-border pb-2">
+                <h3 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-sitemap text-sys-emerald" aria-hidden="true"></i> SKILL TREE</h3>
+                <div class="text-right font-mono">
+                    <span class="text-xs text-sys-textMuted">AVAILABLE SKILL POINTS (SP): </span>
+                    <span class="text-2xl font-bold text-sys-emerald neon-text-green" id="ui-skill-points">0</span>
+                </div>
+            </div>
+            <p class="text-xs text-sys-textMuted mb-6 italic"><i class="fa-solid fa-circle-info text-sys-accent mr-1" aria-hidden="true"></i> Disklaimer: Skill di bawah adalah gamifikasi murni (role-playing). Status terbuka dalam UI tidak secara otomatis membuktikan kompetensi nyata.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8" id="skill-tree-container">
+                <!-- Injected via JS safely -->
+            </div>
+
+        </div>
+
+        <!-- QUEST BOARD SECTION -->
+        <div id="section-quest" class="section-container hidden">
+
+            <!-- Boss Quest (Raid) Section -->
+            <section class="sys-panel border-sys-danger/40 shadow-[0_0_15px_rgba(255,0,85,0.1)] rounded-2xl overflow-hidden flex flex-col mb-8">
+                <div class="bg-sys-danger/10 border-b border-sys-danger/20 p-5">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <h3 class="text-xl font-bold text-sys-danger flex items-center gap-2 neon-text-danger">
+                                <i class="fa-solid fa-dungeon" aria-hidden="true"></i> ACTIVE RAID (BOSS QUESTS)
+                            </h3>
+                            <p class="text-xs text-sys-danger/70 font-mono mt-1">Misi raksasa multi-tahap. Selesaikan semua sub-tugas untuk mengklaim EXP masif.</p>
+                        </div>
+                        <button aria-label="Tambah Boss Quest Baru" onclick="system.openBossModal()" class="btn-sys bg-sys-danger text-white font-bold font-mono px-4 py-2 rounded hover:bg-white hover:text-sys-danger transition-colors flex items-center gap-2 text-sm">
+                            <i class="fa-solid fa-skull" aria-hidden="true"></i> NEW RAID
+                        </button>
+                    </div>
+                </div>
+                <div class="p-5 space-y-4" id="boss-quest-list">
+                    <!-- Boss Quests Injected securely here -->
+                </div>
+            </section>
+
+            <!-- Standard Quest Section -->
+            <section class="sys-panel rounded-2xl overflow-hidden flex flex-col">
+                <div class="bg-sys-dark/50 border-b border-sys-border p-6 pb-0">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <h3 class="text-xl font-bold text-white flex items-center gap-3">
+                            <i class="fa-solid fa-clipboard-list text-sys-accent" aria-hidden="true"></i> Standard Quests
+                        </h3>
+                        <button aria-label="Tambah Standard Quest Baru" onclick="system.openQuestModal()" class="btn-sys bg-sys-accent text-sys-dark font-bold font-mono px-4 py-2 rounded hover:bg-white transition-colors flex items-center gap-2 text-sm shadow-[0_0_15px_rgba(0,240,255,0.3)]">
+                            <i class="fa-solid fa-plus" aria-hidden="true"></i> ADD QUEST
+                        </button>
+                    </div>
+
+                    <div class="flex gap-1 overflow-x-auto no-scrollbar font-mono text-sm" id="filter-tabs">
+                        <button aria-label="Filter Semua" onclick="system.setFilter('all')" class="px-4 py-3 text-sys-textMuted hover:text-white transition-colors whitespace-nowrap tab-active" data-filter="all">All</button>
+                        <button aria-label="Filter Harian" onclick="system.setFilter('daily')" class="px-4 py-3 text-sys-textMuted hover:text-white transition-colors whitespace-nowrap" data-filter="daily">Daily</button>
+                        <button aria-label="Filter Mingguan" onclick="system.setFilter('weekly')" class="px-4 py-3 text-sys-textMuted hover:text-white transition-colors whitespace-nowrap" data-filter="weekly">Weekly</button>
+                        <button aria-label="Filter Sekali" onclick="system.setFilter('one-time')" class="px-4 py-3 text-sys-textMuted hover:text-white transition-colors whitespace-nowrap" data-filter="one-time">One-Time</button>
+                        <button aria-label="Filter Milestone" onclick="system.setFilter('milestone')" class="px-4 py-3 text-sys-textMuted hover:text-white transition-colors whitespace-nowrap" data-filter="milestone">Milestones</button>
+                    </div>
+                </div>
+                <div class="p-6 space-y-3 min-h-[300px]" id="quest-list">
+                    <!-- Quests Injected securely here via DOM API -->
+                </div>
+            </section>
+        </div>
+
+        <!-- ANALYTICS SECTION -->
+        <div id="section-analytics" class="section-container hidden">
+            <div class="bg-sys-accent/10 border border-sys-accent/30 rounded-lg p-4 mb-6 flex gap-4 items-start">
+                <i class="fa-solid fa-circle-info text-sys-accent text-xl mt-0.5" aria-hidden="true"></i>
+                <div>
+                    <h4 class="text-sys-accent font-bold text-sm font-mono mb-1">PARADIGMA ANALITIK NYATA</h4>
+                    <p class="text-sys-textMuted text-xs leading-relaxed">
+                        Atribut RPG mencerminkan poin game. Data di panel ini adalah <b>Metrik Dunia Nyata</b> dari catatan aksi aktual. Data Kesehatan melacak kebiasaan mandiri, bukan diagnostik medis.
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="sys-panel p-6 rounded-2xl flex flex-col justify-center relative overflow-hidden tooltip-container">
+                    <h3 class="text-sm font-mono text-sys-textMuted mb-2"><i class="fa-solid fa-scale-balanced mr-2" aria-hidden="true"></i>Disiplin Harian (7 Hari)</h3>
+                    <div class="text-5xl font-bold text-white neon-text-blue" id="ui-metric-discipline">0%</div>
+                    <p class="text-xs text-sys-textMuted mt-2 font-mono">Tingkat penyelesaian Daily Quest aktif.</p>
+                    <div class="absolute right-4 bottom-4 opacity-10 text-6xl" aria-hidden="true"><i class="fa-solid fa-bolt"></i></div>
+                    <span class="tooltip-text absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black border border-sys-border text-white text-[10px] p-2 rounded opacity-0 invisible transition-opacity w-64 z-20 font-mono text-center">
+                        (Log Daily Selesai 7 Hari) / (Daily Aktif x 7) x 100%
+                    </span>
+                </div>
+
+                <div class="sys-panel p-6 rounded-2xl flex flex-col justify-center relative overflow-hidden tooltip-container">
+                    <h3 class="text-sm font-mono text-sys-textMuted mb-2"><i class="fa-solid fa-fire mr-2" aria-hidden="true"></i>Konsistensi Aksi (7 Hari)</h3>
+                    <div class="text-5xl font-bold text-white neon-text-green" id="ui-metric-consistency">0/7</div>
+                    <p class="text-xs text-sys-textMuted mt-2 font-mono">Hari aktif menyumbang minimal 1 metrik nyata.</p>
+                    <div class="absolute right-4 bottom-4 opacity-10 text-6xl" aria-hidden="true"><i class="fa-solid fa-calendar-check"></i></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="sys-panel p-6 rounded-2xl flex flex-col min-h-[350px]">
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="text-sm font-mono text-sys-textMuted"><i class="fa-solid fa-bullseye mr-2" aria-hidden="true"></i>Target Mingguan vs Pencapaian</h3>
+                        <button aria-label="Set Target Mingguan" onclick="system.openTargetModal()" class="text-xs font-mono text-sys-accent hover:underline"><i class="fa-solid fa-gear" aria-hidden="true"></i> Set Target</button>
+                    </div>
+                    <p class="text-[10px] text-sys-textMuted font-mono mb-4 border-b border-sys-border pb-2">Ditampilkan % normalisasi (Maks 100%).</p>
+                    <div class="flex-1 w-full relative min-h-[250px]" aria-label="Grafik Batang Target Mingguan" role="img">
+                        <canvas id="targetBarChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="sys-panel p-6 rounded-2xl flex flex-col min-h-[350px]">
+                    <div class="flex justify-between items-center mb-4 border-b border-sys-border pb-2">
+                        <h3 class="text-sm font-mono text-sys-textMuted"><i class="fa-solid fa-chart-area mr-2" aria-hidden="true"></i>Tren Aktivitas (7 Hari)</h3>
+                        <label for="trend-metric-selector" class="sr-only">Pilih Metrik Tren</label>
+                        <select id="trend-metric-selector" onchange="system.updateAnalyticsUI()" class="bg-sys-dark border border-sys-border text-white text-xs font-mono rounded px-2 py-1 outline-none focus:border-sys-accent">
+                            <option value="study">Belajar (Menit)</option>
+                            <option value="coding">Coding (Sesi)</option>
+                            <option value="workout">Olahraga (Menit)</option>
+                            <option value="health">Kesehatan (Sesi)</option>
+                        </select>
+                    </div>
+                    <div class="flex-1 w-full relative min-h-[250px]" aria-label="Grafik Garis Tren Aktivitas" role="img">
+                        <canvas id="trendLineChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SETTINGS / DATA CENTER SECTION -->
+        <div id="section-settings" class="section-container hidden">
+
+            <div class="bg-sys-danger/10 border border-sys-danger/30 rounded-lg p-5 mb-8 flex gap-4 items-start">
+                <i class="fa-solid fa-shield-halved text-sys-danger text-2xl mt-1" aria-hidden="true"></i>
+                <div>
+                    <h4 class="text-sys-danger font-bold text-base font-mono mb-2">SECURITY CLEARANCE & LOCAL STORAGE</h4>
+                    <p class="text-sys-textMuted text-sm leading-relaxed font-mono">
+                        Semua data (EXP, Quests, Log Aktivitas) disimpan <b>hanya di dalam Local Storage peramban (browser) ini</b>. Tidak ada backend server. Tidak ada database terenkripsi. 
+                        Jangan pernah memasukkan atau menyimpan informasi sensitif (password, token rahasia, NIK) ke dalam nama Quest atau deskripsi.
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Export Module -->
+                <div class="sys-panel p-6 rounded-2xl border border-sys-border hover:border-sys-accent/50 transition-colors">
+                    <h3 class="text-xl font-bold text-white mb-2"><i class="fa-solid fa-download text-sys-accent mr-2" aria-hidden="true"></i>Export Backup</h3>
+                    <p class="text-sys-textMuted text-xs font-mono mb-6">Unduh seluruh state data ke dalam format JSON. Simpan di tempat yang aman sebagai cadangan.</p>
+                    <button aria-label="Export Backup Data" onclick="system.exportData()" class="btn-sys w-full py-3 bg-sys-accent/20 border border-sys-accent text-sys-accent hover:bg-sys-accent hover:text-sys-dark font-bold font-mono rounded transition-colors flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-file-export" aria-hidden="true"></i> GENERATE JSON BACKUP
+                    </button>
+                </div>
+
+                <!-- Import Module -->
+                <div class="sys-panel p-6 rounded-2xl border border-sys-border hover:border-sys-emerald/50 transition-colors">
+                    <h3 class="text-xl font-bold text-white mb-2"><i class="fa-solid fa-upload text-sys-emerald mr-2" aria-hidden="true"></i>Import Backup</h3>
+                    <p class="text-sys-textMuted text-xs font-mono mb-6">Pulihkan data dari file JSON cadangan. Tindakan ini akan menimpa data saat ini setelah melewati validasi skema keamanan.</p>
+
+                    <label for="import-file" class="sr-only">Upload file JSON cadangan</label>
+                    <input type="file" id="import-file" accept=".json" class="hidden" onchange="system.handleFileSelect(event)">
+                    <button aria-label="Import Backup Data" onclick="document.getElementById('import-file').click()" class="btn-sys w-full py-3 bg-sys-emerald/20 border border-sys-emerald text-sys-emerald hover:bg-sys-emerald hover:text-sys-dark font-bold font-mono rounded transition-colors flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-file-import" aria-hidden="true"></i> SELECT JSON FILE
+                    </button>
+                </div>
+            </div>
+
+            <!-- Danger Zone -->
+            <div class="mt-12 pt-8 border-t border-sys-danger/30">
+                <h3 class="text-xl font-bold text-sys-danger mb-2"><i class="fa-solid fa-skull mr-2" aria-hidden="true"></i>Danger Zone</h3>
+                <p class="text-sys-textMuted text-xs font-mono mb-4">Menghapus seluruh profil pengguna, ledger EXP, riwayat, dan daftar Quest dari peramban ini. Tidak dapat dikembalikan tanpa file backup.</p>
+                <button aria-label="Hapus Seluruh Sistem" onclick="system.resetData()" class="btn-sys px-6 py-3 bg-transparent border border-sys-danger text-sys-danger hover:bg-sys-danger hover:text-white font-bold font-mono rounded transition-colors flex items-center gap-2">
+                    <i class="fa-solid fa-bomb" aria-hidden="true"></i> FORMAT SYSTEM WIPE
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Menghubungkan JS Eksternal -->
+    <script src="app.js"></script>
+</body>
+</html>

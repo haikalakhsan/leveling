@@ -1,0 +1,44 @@
+body {
+    background-color: #050914; color: #E2E8F0; overflow-x: hidden;
+    background-image: linear-gradient(rgba(15, 22, 38, 0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(15, 22, 38, 0.8) 1px, transparent 1px);
+    background-size: 30px 30px; background-position: center center;
+}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #050914; }
+::-webkit-scrollbar-thumb { background: #1E2D4A; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #00F0FF; }
+
+.sys-panel {
+    background: rgba(15, 22, 38, 0.85); backdrop-filter: blur(12px);
+    border: 1px solid rgba(30, 45, 74, 0.8); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); transition: all 0.3s ease;
+}
+
+.neon-text-blue { text-shadow: 0 0 10px rgba(0, 240, 255, 0.6); }
+.neon-text-green { text-shadow: 0 0 10px rgba(0, 255, 163, 0.6); }
+.neon-text-warning { text-shadow: 0 0 10px rgba(255, 184, 0, 0.6); }
+.neon-text-danger { text-shadow: 0 0 10px rgba(255, 0, 85, 0.6); }
+.neon-text-purple { text-shadow: 0 0 10px rgba(181, 52, 255, 0.6); }
+
+.xp-bar-fill { transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+.btn-sys { position: relative; overflow: hidden; transition: all 0.2s; }
+.btn-sys:active { transform: scale(0.95); }
+.btn-sys:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.tab-active { border-bottom: 2px solid #00F0FF; color: #00F0FF; background: rgba(0, 240, 255, 0.05); }
+.nav-active { background: rgba(0, 240, 255, 0.1); color: #00F0FF; border-left-color: #00F0FF; }
+
+@keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-10px); } }
+.toast-enter { animation: slideInRight 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+.toast-exit { animation: fadeOut 0.3s forwards; }
+
+.tooltip-container:hover .tooltip-text { opacity: 1; visibility: visible; }
+
+.cyber-checkbox {
+    appearance: none; width: 1.25rem; height: 1.25rem; border: 1px solid #1E2D4A; border-radius: 0.25rem;
+    background: #050914; cursor: pointer; position: relative; display: flex; align-items: center; justify-content: center;
+}
+.cyber-checkbox:checked { background: #00FFA3; border-color: #00FFA3; }
+.cyber-checkbox:checked::after { content: '\f00c'; font-family: "Font Awesome 6 Free"; font-weight: 900; color: #050914; font-size: 0.75rem; }
+
+.skill-node-locked { filter: grayscale(100%) opacity(50%); border-color: #1E2D4A !important; }
