@@ -11,6 +11,15 @@ const system = (function() {
     const BASE_EXP = 100;
     const EXP_MULTIPLIER = 1.5;
 
+    const NEON = {
+        'text-gray-400': '',
+        'text-sys-emerald': 'neon-text-green',
+        'text-sys-accent': 'neon-text-blue',
+        'text-sys-purple': 'neon-text-purple',
+        'text-sys-warning': 'neon-text-warning',
+        'text-sys-danger': 'neon-text-danger'
+    };
+
     const METRICS_DEF = {
         study: { id: 'study', name: "Belajar", unit: "menit", defaultTarget: 300 },
         coding: { id: 'coding', name: "Coding", unit: "sesi", defaultTarget: 5 },
@@ -37,7 +46,7 @@ const system = (function() {
     ];
 
     const SKILLS_DEF = [
-        { id: 'lrn_1', name: 'Fast Learner', desc: 'Meningkatkan kecepatan memproses informasi dasar.', cost: 1, category: 'Learning', req: [] },
+        { id: 'lrn_1', name: 'Fast Learner', desc: 'Meningkatkan kecepatan memproses informasi dasar (+10% EXP belajar).', cost: 1, category: 'Learning', req: [] },
         { id: 'lrn_2', name: 'Deep Focus', desc: 'Ketahanan mempertahankan fokus dalam durasi panjang.', cost: 2, category: 'Learning', req: ['lrn_1'] },
         { id: 'fit_1', name: 'Endurance', desc: 'Peningkatan stamina kardiovaskular dasar.', cost: 1, category: 'Fitness', req: [] },
         { id: 'fit_2', name: 'Iron Body', desc: 'Kekuatan otot inti dan daya tahan tubuh.', cost: 2, category: 'Fitness', req: ['fit_1'] },
@@ -93,6 +102,28 @@ const system = (function() {
     let currentFilter = 'all';
     let charts = { radar: null, targetBar: null, trendLine: null };
 
+    // --- SANITIZERS & HELPERS ---
+    const num = (v, d = 0, min = 0, max = 1e9) => Number.isFinite(+v) ? Math.min(Math.max(+v, min), max) : d;
+    const str = (v, max = 250) => String(v ?? '').slice(0, max);
+
+    function getNetGain(txId) {
+        return state.ledger.reduce((s, l) => l.txId === txId ? s + (Number(l.amount) || 0) : s, 0);
+    }
+
+    function countNetCompleted() {
+        const m = new Map();
+        state.ledger.forEach(l => m.set(l.txId, (m.get(l.txId) || 0) + (Number(l.amount) || 0)));
+        return [...m].filter(([id, net]) => net > 0 && !id.startsWith('boss-')).length;
+    }
+
+    function getDisplayStreak(q) {
+        if (!q.streak || !q.history?.length) return 0;
+        if (q.history.includes(getPeriodString(q))) return q.streak.current;
+        const d = new Date(); d.setDate(d.getDate() - (q.type === 'weekly' ? 7 : 1));
+        const prev = q.type === 'weekly' ? DateUtils.getWeekStart(d) : DateUtils.getLocalDate(d);
+        return q.history.includes(prev) ? q.streak.current : 0;
+    }
+
     // --- XSS SECURE UI HELPERS ---
     function showToast(message, type = 'info') {
         const toast = document.createElement('div');
@@ -129,20 +160,33 @@ const system = (function() {
     }
 
     // --- SCHEMA & DATA MIGRATION ---
-    function validateSchema(parsedData) {
-        if (!parsedData || typeof parsedData !== 'object') throw new Error("Format JSON tidak valid.");
-        let s = { ...parsedData };
-        
-        if (Array.isArray(s.quests) && s.quests.length > 2000) throw new Error("Terlalu banyak quest (Melebihi batas aman).");
-        if (!s.player || typeof s.player.totalExp !== 'number' || isNaN(s.player.totalExp)) s.player = { ...defaultState.player };
-        if (!s.stats || typeof s.stats !== 'object') s.stats = { ...defaultState.stats };
-        
-        VALID_STATS.forEach(st => { if (typeof s.stats[st] !== 'number' || isNaN(s.stats[st])) s.stats[st] = 10; });
-        if (!Array.isArray(s.quests)) s.quests = []; if (!Array.isArray(s.bossQuests)) s.bossQuests = [];
-        if (!Array.isArray(s.ledger)) s.ledger = []; if (!Array.isArray(s.activityLogs)) s.activityLogs = [];
-        if (!Array.isArray(s.achievements)) s.achievements = []; if (!Array.isArray(s.skills)) s.skills = [];
-        if (!s.metrics) s.metrics = { ...defaultState.metrics };
-
+    function validateSchema(p) {
+        if (!p || typeof p !== 'object') throw new Error("Format JSON tidak valid.");
+        if (Array.isArray(p.quests) && p.quests.length > 2000) throw new Error("Terlalu banyak quest (Melebihi batas aman).");
+        const s = { version: CURRENT_VERSION };
+        s.player = { totalExp: num(p.player?.totalExp), statPoints: num(p.player?.statPoints), skillPoints: num(p.player?.skillPoints) };
+        s.stats = {}; VALID_STATS.forEach(k => s.stats[k] = num(p.stats?.[k], 10, 1, 100000));
+        s.quests = (Array.isArray(p.quests) ? p.quests : []).map(q => ({
+            id: str(q.id, 40) || Date.now().toString(), title: str(q.title, 100), desc: str(q.desc),
+            type: ['daily','weekly','one-time','milestone'].includes(q.type) ? q.type : 'one-time',
+            exp: num(q.exp, 10, 0, 1000), metricId: METRICS_DEF[q.metricId] ? q.metricId : 'none',
+            metricValue: num(q.metricValue, 0, 0, 10000), createdAt: num(q.createdAt, Date.now()),
+            history: Array.isArray(q.history) ? q.history.map(h => str(h, 20)) : [],
+            streak: { current: num(q.streak?.current), longest: num(q.streak?.longest) }
+        }));
+        s.bossQuests = (Array.isArray(p.bossQuests) ? p.bossQuests : []).map(b => ({
+            id: str(b.id, 40), title: str(b.title, 100), desc: str(b.desc), exp: num(b.exp, 1000, 0, 50000),
+            deadline: str(b.deadline, 10), claimed: !!b.claimed, createdAt: num(b.createdAt, Date.now()),
+            subtasks: (Array.isArray(b.subtasks) ? b.subtasks : []).map((t, i) => ({ id: i, text: str(t.text, 100), completed: !!t.completed }))
+        }));
+        s.ledger = (Array.isArray(p.ledger) ? p.ledger : []).map(l => ({
+            txId: str(l.txId, 80), type: l.type === 'REVERT' ? 'REVERT' : 'GAIN', amount: num(l.amount, 0, -1e9, 1e9), timestamp: num(l.timestamp)
+        }));
+        s.activityLogs = (Array.isArray(p.activityLogs) ? p.activityLogs : []).filter(l => METRICS_DEF[l.metricId])
+            .map(l => ({ id: str(l.id, 80), questId: str(l.questId, 40), metricId: l.metricId, value: num(l.value), dateStr: str(l.dateStr, 10), timestamp: num(l.timestamp) }));
+        s.achievements = (Array.isArray(p.achievements) ? p.achievements : []).filter(a => ACHIEVEMENTS_DEF.some(d => d.id === a));
+        s.skills = (Array.isArray(p.skills) ? p.skills : []).filter(k => SKILLS_DEF.some(d => d.id === k));
+        s.metrics = {}; Object.keys(METRICS_DEF).forEach(k => s.metrics[k] = { target: num(p.metrics?.[k]?.target, METRICS_DEF[k].defaultTarget, 1, 100000) });
         return s;
     }
 
@@ -153,6 +197,7 @@ const system = (function() {
             if (!migrated.achievements) migrated.achievements = [];
             if (!migrated.skills) migrated.skills = [];
             if (!migrated.bossQuests) migrated.bossQuests = [];
+            migrated.player = migrated.player || {};
             if (!migrated.player.skillPoints || isNaN(migrated.player.skillPoints)) migrated.player.skillPoints = 0;
             if (!migrated.metrics) migrated.metrics = { ...defaultState.metrics };
             migrated.version = CURRENT_VERSION;
@@ -195,7 +240,7 @@ const system = (function() {
 
     function calculateRank() {
         const lvl = calculateLevelInfo(state.player.totalExp).level;
-        const totalQuestsDone = state.ledger.filter(l => l.type === 'GAIN' && !l.txId.startsWith('boss')).length;
+        const totalQuestsDone = countNetCompleted();
         let currentRank = RANKS_DEF[0];
         for (let i = RANKS_DEF.length - 1; i >= 0; i--) {
             if (lvl >= RANKS_DEF[i].reqLvl && totalQuestsDone >= RANKS_DEF[i].reqQuests) { currentRank = RANKS_DEF[i]; break; }
@@ -205,7 +250,7 @@ const system = (function() {
 
     function checkAchievements() {
         let newlyUnlocked = false;
-        const totalGains = state.ledger.filter(l => l.type === 'GAIN').length;
+        const totalGains = countNetCompleted() + state.bossQuests.filter(b => b.claimed).length;
         const maxStreak = Math.max(...state.quests.map(q => q.streak ? q.streak.longest : 0), 0);
 
         let studyTotal = 0; let codingTotal = 0;
@@ -236,10 +281,23 @@ const system = (function() {
 
     function processExpAndLog(quest, isCompleting, periodStr, isBoss = false) {
         const txId = isBoss ? `boss-${quest.id}-${periodStr}` : `${quest.id}-${periodStr}`;
-        const amount = isCompleting ? quest.exp : -quest.exp;
+        const net = getNetGain(txId);
+
+        if (isCompleting && net > 0) return false;
+        if (!isCompleting && net <= 0) {
+            state.activityLogs = state.activityLogs.filter(l => l.id !== txId);
+            return true;
+        }
+
+        // Skill bonus: Fast Learner (+10% EXP for study metric)
+        let baseExp = quest.exp;
+        if (isCompleting && quest.metricId === 'study' && state.skills.includes('lrn_1')) {
+            baseExp = Math.round(baseExp * 1.1);
+        }
+
+        const amount = isCompleting ? baseExp : -net;
 
         if (isCompleting) {
-            if (state.ledger.some(l => l.txId === txId && l.type === 'GAIN')) return false; 
             const oldLvl = calculateLevelInfo(state.player.totalExp).level;
             state.player.totalExp += amount;
             state.ledger.push({ txId, type: 'GAIN', amount, timestamp: Date.now() });
@@ -295,9 +353,17 @@ const system = (function() {
     function updateAnalyticsCharts() {
         const dailyQuests = state.quests.filter(q => q.type === 'daily');
         const last7Days = DateUtils.getLastPeriods('daily', 7);
-        let possible = dailyQuests.length * 7;
-        let completedCount = 0;
+        const now = Date.now();
+        const oneDayMs = 86400000;
 
+        // Disiplin Harian lebih adil: hitung possible dari hari sejak createdAt (maksimal 7)
+        let possible = 0;
+        dailyQuests.forEach(q => {
+            const ageInDays = Math.max(1, Math.min(7, Math.floor((now - (q.createdAt || now)) / oneDayMs) + 1));
+            possible += ageInDays;
+        });
+
+        let completedCount = 0;
         dailyQuests.forEach(q => { if (q.history) { q.history.forEach(h => { if (last7Days.includes(h)) completedCount++; }); } });
 
         const disciplinePct = possible > 0 ? Math.min(Math.round((completedCount / possible) * 100), 100) : 0;
@@ -335,7 +401,8 @@ const system = (function() {
         const achList = document.getElementById('achievements-list'); achList.innerHTML = '';
         ACHIEVEMENTS_DEF.forEach(ach => {
             const isUnlocked = state.achievements.includes(ach.id);
-            const div = document.createElement('div'); div.className = `p-4 rounded-xl border flex flex-col items-center justify-center text-center gap-2 transition-all tooltip-container ${isUnlocked ? 'bg-sys-dark border-' + ach.color.split('-')[1] : 'bg-sys-dark/30 border-sys-border opacity-50 grayscale'}`;
+            const borderCls = 'border-' + ach.color.replace('text-', '');
+            const div = document.createElement('div'); div.className = `p-4 rounded-xl border flex flex-col items-center justify-center text-center gap-2 transition-all relative tooltip-container ${isUnlocked ? 'bg-sys-dark ' + borderCls : 'bg-sys-dark/30 border-sys-border opacity-50 grayscale'}`;
             const icon = document.createElement('i'); icon.className = `fa-solid ${ach.icon} text-3xl ${isUnlocked ? ach.color : 'text-sys-textMuted'}`; icon.setAttribute('aria-hidden', 'true');
             const title = document.createElement('span'); title.className = `font-mono text-xs font-bold ${isUnlocked ? 'text-white' : 'text-sys-textMuted'}`; title.textContent = ach.name;
             const tooltip = document.createElement('span'); tooltip.className = "tooltip-text absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 invisible transition-opacity whitespace-nowrap z-20 font-mono"; tooltip.textContent = ach.desc;
@@ -376,7 +443,12 @@ const system = (function() {
             const badge = document.createElement('span'); badge.className = `text-[9px] bg-sys-dark border px-2 py-0.5 rounded font-mono mr-2 ${boss.claimed ? 'text-sys-purple border-sys-purple' : 'text-sys-danger border-sys-danger'}`; badge.textContent = boss.claimed ? "CLEARED" : "RAID ACTIVE";
             const title = document.createElement('h4'); title.className = `inline text-lg font-bold font-mono ${boss.claimed ? 'text-white' : 'text-sys-danger'}`; title.textContent = boss.title;
             const desc = document.createElement('p'); desc.className = "text-xs text-sys-textMuted mt-1"; desc.textContent = boss.desc;
-            if(boss.deadline && !boss.claimed) { const dl = document.createElement('p'); dl.className="text-[10px] text-sys-warning mt-1 font-mono"; dl.innerHTML = `<i class="fa-regular fa-clock"></i> Deadline: ${boss.deadline}`; desc.appendChild(dl); }
+            if(boss.deadline && !boss.claimed) { 
+                const dl = document.createElement('p'); dl.className="text-[10px] text-sys-warning mt-1 font-mono"; 
+                dl.innerHTML = '<i class="fa-regular fa-clock"></i> ';
+                dl.append('Deadline: ' + boss.deadline);
+                desc.appendChild(dl); 
+            }
             titleDiv.appendChild(badge); titleDiv.appendChild(title); titleDiv.appendChild(desc);
 
             const expDiv = document.createElement('div'); expDiv.className = `font-bold font-mono ${boss.claimed ? 'text-sys-textMuted' : 'text-sys-danger'}`; expDiv.textContent = `+${boss.exp} EXP`;
@@ -414,7 +486,7 @@ const system = (function() {
 
     function renderQuests() {
         const list = document.getElementById('quest-list'); list.innerHTML = ''; 
-        let filtered = state.quests; if (currentFilter !== 'all') filtered = state.quests.filter(q => q.type === currentFilter);
+        let filtered = [...state.quests]; if (currentFilter !== 'all') filtered = filtered.filter(q => q.type === currentFilter);
         if (filtered.length === 0) { list.innerHTML = `<div class="flex flex-col items-center justify-center py-12 text-sys-border font-mono text-sm"><i class="fa-solid fa-satellite-dish text-5xl mb-4 block opacity-30"></i>Tidak ada sinyal quest.</div>`; return; }
 
         filtered.sort((a, b) => {
@@ -436,7 +508,7 @@ const system = (function() {
             const titleWrap = document.createElement('div'); titleWrap.className = "flex flex-wrap items-center gap-2 mb-1";
             const typeBadge = document.createElement('span'); typeBadge.className = "text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-sys-dark border border-sys-border text-sys-textMuted font-mono"; typeBadge.textContent = quest.type; titleWrap.appendChild(typeBadge);
 
-            if (quest.metricId && quest.metricId !== 'none') {
+            if (quest.metricId && quest.metricId !== 'none' && METRICS_DEF[quest.metricId]) {
                 const metricBadge = document.createElement('span'); metricBadge.className = "text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-sys-accent/10 border border-sys-accent/30 text-sys-accent font-mono flex items-center gap-1";
                 const icon = document.createElement('i'); icon.className = "fa-solid fa-link"; const mText = document.createTextNode(` ${METRICS_DEF[quest.metricId].name} (${quest.metricValue} ${METRICS_DEF[quest.metricId].unit})`);
                 metricBadge.appendChild(icon); metricBadge.appendChild(mText); titleWrap.appendChild(metricBadge);
@@ -447,12 +519,18 @@ const system = (function() {
             leftDiv.appendChild(textDiv); wrapper.appendChild(leftDiv);
 
             const rightDiv = document.createElement('div'); rightDiv.className = "flex items-center gap-6 md:pl-4 md:border-l border-sys-border/50";
-            const infoDiv = document.createElement('div'); infoDiv.className = "text-right whitespace-nowrap min-w-[80px]"; infoDiv.innerHTML = `<span class="text-xs text-sys-warning font-mono">+${quest.exp} EXP</span>`; rightDiv.appendChild(infoDiv);
+            const infoDiv = document.createElement('div'); infoDiv.className = "text-right whitespace-nowrap min-w-[80px]"; 
+            const expEl = document.createElement('span'); expEl.className = 'text-xs text-sys-warning font-mono';
+            expEl.textContent = `+${quest.exp} EXP`; infoDiv.appendChild(expEl);
+            rightDiv.appendChild(infoDiv);
 
             if (quest.type === 'daily' || quest.type === 'weekly') {
                 const streakDiv = document.createElement('div'); streakDiv.className = "hidden sm:flex flex-col items-end gap-1";
-                const onFire = quest.streak && quest.streak.current >= 3;
-                const streakText = document.createElement('div'); streakText.className = `text-[10px] font-mono font-bold flex items-center gap-1 ${onFire ? 'text-sys-danger neon-text-danger' : 'text-sys-textMuted'}`; streakText.innerHTML = `<i class="fa-solid fa-fire"></i> ${quest.streak ? quest.streak.current : 0} STRK`;
+                const displayStreak = getDisplayStreak(quest);
+                const onFire = displayStreak >= 3;
+                const streakText = document.createElement('div'); streakText.className = `text-[10px] font-mono font-bold flex items-center gap-1 ${onFire ? 'text-sys-danger neon-text-danger' : 'text-sys-textMuted'}`; 
+                streakText.innerHTML = '<i class="fa-solid fa-fire"></i> ';
+                streakText.append(`${displayStreak} STRK`);
                 streakDiv.appendChild(streakText); rightDiv.appendChild(streakDiv);
             }
 
@@ -543,7 +621,8 @@ const system = (function() {
     function updateUI() {
         const lvlData = calculateLevelInfo(state.player.totalExp); const rankData = calculateRank();
         document.getElementById('ui-level').textContent = lvlData.level; document.getElementById('ui-exp').textContent = lvlData.currentExp; document.getElementById('ui-max-exp').textContent = lvlData.maxExp; document.getElementById('ui-combat-power').textContent = getCombatPower(state.stats, lvlData.level).toLocaleString();
-        document.getElementById('ui-hunter-rank-badge').innerHTML = `[RANK: <span class="${rankData.color} font-bold">${rankData.id}</span>]`; document.getElementById('ui-big-rank').textContent = rankData.id; document.getElementById('ui-big-rank').className = `text-6xl font-bold ${rankData.color} ${rankData.color.replace('text-', 'neon-text-')}`;
+        document.getElementById('ui-hunter-rank-badge').innerHTML = `[RANK: <span class="${rankData.color} font-bold">${rankData.id}</span>]`; document.getElementById('ui-big-rank').textContent = rankData.id; 
+        document.getElementById('ui-big-rank').className = `text-6xl font-bold ${rankData.color} ${NEON[rankData.color] || ''}`;
         const xpPercentage = Math.min((lvlData.currentExp / lvlData.maxExp) * 100, 100); document.getElementById('ui-xp-bar').style.width = `${xpPercentage}%`; document.getElementById('ui-level-message').textContent = `Membutuhkan ${lvlData.maxExp - lvlData.currentExp} EXP untuk Level Up.`;
         const statAlert = document.getElementById('ui-stat-point-alert'); const statBtns = document.querySelectorAll('.stat-btn');
         VALID_STATS.forEach(s => { document.getElementById(`ui-stat-${s}`).textContent = state.stats[s]; });
@@ -578,7 +657,14 @@ const system = (function() {
     // --- MODALS FORMS ---
     const DOM = { qModal: document.getElementById('quest-modal'), qContent: document.getElementById('quest-modal-content'), form: document.getElementById('quest-form'), bModal: document.getElementById('boss-modal'), bContent: document.getElementById('boss-modal-content'), bForm: document.getElementById('boss-form'), tModal: document.getElementById('target-modal'), tContent: document.getElementById('target-modal-content'), tForm: document.getElementById('target-form')};
     
-    function openQuestModal() { DOM.form.reset(); document.getElementById('q-id').value = ''; DOM.qModal.classList.remove('hidden'); DOM.qModal.classList.add('flex'); requestAnimationFrame(() => { DOM.qModal.classList.remove('opacity-0'); DOM.qContent.classList.remove('scale-95'); }); }
+    function openQuestModal() { 
+        document.getElementById('quest-modal-title').textContent = 'REGISTER NEW QUEST';
+        document.getElementById('q-metric-unit').textContent = 'Unit';
+        DOM.form.reset(); 
+        document.getElementById('q-id').value = ''; 
+        DOM.qModal.classList.remove('hidden'); DOM.qModal.classList.add('flex'); 
+        requestAnimationFrame(() => { DOM.qModal.classList.remove('opacity-0'); DOM.qContent.classList.remove('scale-95'); }); 
+    }
     function closeQuestModal() { DOM.qModal.classList.add('opacity-0'); DOM.qContent.classList.add('scale-95'); setTimeout(() => { DOM.qModal.classList.add('hidden'); DOM.qModal.classList.remove('flex'); }, 300); }
     function editQuest(id) {
         const quest = state.quests.find(q => q.id === id); if(!quest) return;
@@ -613,6 +699,19 @@ const system = (function() {
     }
     function closeTargetModal() { DOM.tModal.classList.add('opacity-0'); DOM.tContent.classList.add('scale-95'); setTimeout(() => { DOM.tModal.classList.add('hidden'); DOM.tModal.classList.remove('flex'); }, 300); }
 
+    function closeAllOpenModals() {
+        if (!DOM.qModal.classList.contains('hidden')) closeQuestModal();
+        if (!DOM.bModal.classList.contains('hidden')) closeBossModal();
+        if (!DOM.tModal.classList.contains('hidden')) closeTargetModal();
+        const sModal = document.getElementById('sys-modal');
+        if (sModal && !sModal.classList.contains('hidden')) {
+            sModal.classList.add('opacity-0');
+            const content = document.getElementById('sys-modal-content');
+            if (content) content.classList.add('scale-95');
+            setTimeout(() => { sModal.classList.add('hidden'); sModal.classList.remove('flex'); }, 300);
+        }
+    }
+
     document.getElementById('q-metric-id').addEventListener('change', (e) => { const val = e.target.value; document.getElementById('q-metric-unit').textContent = val === 'none' ? 'Unit' : METRICS_DEF[val].unit; });
 
     DOM.form.addEventListener('submit', (e) => {
@@ -646,6 +745,16 @@ const system = (function() {
         saveState(); updateUI(); closeTargetModal(); showToast("Target Metrik Diperbarui", "success");
     });
 
+    // Close modal on Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeAllOpenModals();
+    });
+
+    // Auto-refresh on visibilitychange (e.g. crossing midnight with open tab)
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) updateUI();
+    });
+
     // --- INIT EXPORT ---
     window.addEventListener('DOMContentLoaded', () => { loadState(); updateUI(); showToast(`Awakening System V7.1 Online.`, "success"); });
 
@@ -653,7 +762,7 @@ const system = (function() {
         addStat, toggleQuest, deleteQuest, resetData: () => { showConfirmModal("FORMAT SYSTEM", "Yakin hapus semua profil, ledger, dan riwayat? Data tidak dapat dipulihkan.", () => { localStorage.removeItem(STORAGE_KEY); location.reload(); })}, 
         openQuestModal, closeQuestModal, openBossModal, closeBossModal, addBossSubtaskField, setFilter, switchTab, openTargetModal, closeTargetModal,
         exportData: () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' })); a.download = `SYS_CORE_V7.1_${Date.now()}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); },
-        handleFileSelect: (e) => { const file = e.target.files[0]; if(!file) return; e.target.value = ''; const reader = new FileReader(); reader.onload = (ev) => { try { const parsed = JSON.parse(ev.target.result); const valid = executeMigration(parsed); showConfirmModal("IMPORT?", "Tindakan ini akan menimpa seluruh state data Anda saat ini.", () => { state = valid; saveState(); updateUI(); showToast("Impor Data Sukses.", "success"); }); } catch(err) { showToast(`Impor dibatalkan: ${err.message}`, "error"); } }; reader.readAsText(file); }, 
+        handleFileSelect: (e) => { const file = e.target.files[0]; if(!file) return; e.target.value = ''; const reader = new FileReader(); reader.onload = (ev) => { try { const parsed = JSON.parse(ev.target.result); const valid = executeMigration(parsed); showConfirmModal("IMPORT?", "Tindakan ini akan menimpa seluruh state data Anda saat ini.", () => { try { localStorage.setItem(STORAGE_KEY + '_backup', JSON.stringify(state)); } catch(e) {} state = valid; saveState(); updateUI(); showToast("Impor Data Sukses.", "success"); }); } catch(err) { showToast(`Impor dibatalkan: ${err.message}`, "error"); } }; reader.readAsText(file); }, 
         updateAnalyticsUI: () => { updateAnalyticsCharts(); }
     };
 })();

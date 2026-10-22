@@ -39,7 +39,7 @@
     <div id="toast-container" aria-live="polite" class="fixed top-5 right-5 z-[200] flex flex-col gap-3 w-80 pointer-events-none"></div>
 
     <!-- System Confirmation Modal -->
-    <div id="sys-modal" role="dialog" aria-labelledby="sys-modal-title" class="fixed inset-0 bg-black/80 z-[100] hidden items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
+    <div id="sys-modal" role="dialog" aria-modal="true" aria-labelledby="sys-modal-title" class="fixed inset-0 bg-black/80 z-[100] hidden items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
         <div class="sys-panel p-6 max-w-md w-11/12 rounded-xl border border-sys-warning shadow-2xl transform scale-95 transition-transform duration-300" id="sys-modal-content">
             <h3 class="text-sys-warning font-bold text-xl mb-4 border-b border-sys-warning/30 pb-2 flex items-center gap-2">
                 <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> <span id="sys-modal-title">SYSTEM PROMPT</span>
@@ -53,7 +53,7 @@
     </div>
 
     <!-- Add/Edit Quest Modal -->
-    <div id="quest-modal" role="dialog" aria-labelledby="quest-modal-title" class="fixed inset-0 bg-black/80 z-[90] hidden items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
+    <div id="quest-modal" role="dialog" aria-modal="true" aria-labelledby="quest-modal-title" class="fixed inset-0 bg-black/80 z-[90] hidden items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
         <div class="sys-panel p-6 max-w-xl w-11/12 rounded-xl border border-sys-accent shadow-2xl transform scale-95 transition-transform duration-300 overflow-y-auto max-h-[90vh]" id="quest-modal-content">
             <h3 class="text-sys-accent font-bold text-xl mb-4 border-b border-sys-accent/30 pb-2 flex items-center gap-2">
                 <i class="fa-solid fa-folder-plus" aria-hidden="true"></i> <span id="quest-modal-title">REGISTER NEW QUEST</span>
@@ -125,7 +125,7 @@
     </div>
 
     <!-- Boss Quest Modal -->
-    <div id="boss-modal" role="dialog" aria-labelledby="boss-modal-title" class="fixed inset-0 bg-black/80 z-[90] hidden items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
+    <div id="boss-modal" role="dialog" aria-modal="true" aria-labelledby="boss-modal-title" class="fixed inset-0 bg-black/80 z-[90] hidden items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
         <div class="sys-panel p-6 max-w-xl w-11/12 rounded-xl border border-sys-danger shadow-2xl transform scale-95 transition-transform duration-300 max-h-[90vh] overflow-y-auto" id="boss-modal-content">
             <h3 class="text-sys-danger font-bold text-xl mb-4 border-b border-sys-danger/30 pb-2 flex items-center gap-2">
                 <i class="fa-solid fa-skull" aria-hidden="true"></i> <span id="boss-modal-title">REGISTER RAID / BOSS QUEST</span>
@@ -171,7 +171,7 @@
     </div>
 
     <!-- Analytics Target Modal -->
-    <div id="target-modal" role="dialog" aria-labelledby="target-modal-title" class="fixed inset-0 bg-black/80 z-[90] hidden items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
+    <div id="target-modal" role="dialog" aria-modal="true" aria-labelledby="target-modal-title" class="fixed inset-0 bg-black/80 z-[90] hidden items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
         <div class="sys-panel p-6 max-w-sm w-11/12 rounded-xl border border-sys-accent shadow-2xl transform scale-95 transition-transform duration-300" id="target-modal-content">
             <h3 class="text-sys-accent font-bold text-xl mb-4 border-b border-sys-accent/30 pb-2 flex items-center gap-2">
                 <i class="fa-solid fa-bullseye" aria-hidden="true"></i> <span id="target-modal-title">UPDATE METRIC TARGETS</span>
@@ -189,7 +189,7 @@
     </div>
 
     <!-- Sidebar Navigation -->
-    <nav class="w-full md:w-72 sys-panel flex flex-col p-5 md:fixed z-40 border-b md:border-r border-sys-border overflow-y-auto md:min-h-screen shrink-0">
+    <nav class="w-full md:w-72 sys-panel flex flex-col p-5 md:fixed md:inset-y-0 md:left-0 md:h-screen z-40 border-b md:border-r border-sys-border overflow-y-auto shrink-0">
         <div class="flex items-center gap-4 mb-8 pb-6 border-b border-sys-border">
             <div class="relative">
                 <i class="fa-solid fa-microchip text-sys-accent text-3xl" aria-hidden="true"></i>

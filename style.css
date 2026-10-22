@@ -42,3 +42,6 @@ body {
 .cyber-checkbox:checked::after { content: '\f00c'; font-family: "Font Awesome 6 Free"; font-weight: 900; color: #050914; font-size: 0.75rem; }
 
 .skill-node-locked { filter: grayscale(100%) opacity(50%); border-color: #1E2D4A !important; }
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
